@@ -3,6 +3,7 @@ import json
 from PIL import Image
 from difflib import SequenceMatcher
 import streamlit as st
+import zipfile
 
 CONFIG_FILE = "config.json"
 
@@ -17,7 +18,7 @@ def find_similar_groups(folder_path, threshold=0.75):
         group = [base]
         similar_files = [f for f in files if similar(base, f) >= threshold]
         for f in similar_files:
-            if len(group) < 4:  # Ensure group does not exceed 4 images
+            if len(group) < 4:
                 group.append(f)
                 files.remove(f)
         groups.append(group)
@@ -27,7 +28,7 @@ def combine_images_from_folder(folder_path):
     groups = find_similar_groups(folder_path)
     total_groups = len(groups)
     progress = st.progress(0)
-    
+
     for index, group in enumerate(groups):
         if len(group) > 1:
             images = [Image.open(os.path.join(folder_path, image)).convert("RGBA") for image in group]
@@ -68,15 +69,16 @@ def load_last_folder():
 # Streamlit UI
 st.title("Image Combine by Gasia")
 
-# Folder selection
-folder_path = st.text_input("Select Image Folder", value=load_last_folder())
-if st.button("Browse"):
-    folder_path = st.text_input("Select Image Folder", value=st.file_uploader("Upload folder").name)
-    save_last_folder(folder_path)
+# Folder selection using a ZIP upload workaround
+uploaded_zip = st.file_uploader("Upload a ZIP file containing images", type=["zip"])
+if uploaded_zip:
+    with zipfile.ZipFile(uploaded_zip, 'r') as zip_ref:
+        extract_folder = "uploaded_folder"
+        zip_ref.extractall(extract_folder)
+        st.success("ZIP file uploaded and extracted successfully.")
 
-# Start button
-if st.button("Start"):
-    if folder_path and os.path.isdir(folder_path):
-        combine_images_from_folder(folder_path)
-    else:
-        st.warning("Please select a valid folder.")
+        # Display folder contents
+        folder_path = extract_folder
+        st.write(f"Extracted files in: `{folder_path}`")
+        if st.button("Start"):
+            combine_images_from_folder(folder_path)
