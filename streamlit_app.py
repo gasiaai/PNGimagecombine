@@ -42,43 +42,42 @@ def combine_images_and_create_zip(uploaded_files):
                     combined_image.paste(image, (x_offset, 0), image)
                     x_offset += image.width
 
-                # Use the name of the first file in the group for the combined image
-                original_name = os.path.splitext(group[0].name)[0]
-                combined_image_name = f"{original_name}_combined.png"
+                # Retain the exact name of the first image in the group
+                original_name = group[0].name
 
                 # Save the combined image to the ZIP file
                 with BytesIO() as img_buffer:
                     combined_image.save(img_buffer, format="PNG")
                     img_buffer.seek(0)
-                    zipf.writestr(combined_image_name, img_buffer.read())
+                    zipf.writestr(original_name, img_buffer.read())
 
             progress.progress((index + 1) / total_groups)
 
     return output_zip
 
 # Streamlit UI
-st.title("Image Combine and Download as ZIP")
+st.title("รวมภาพ PNG")
 
 # Allow users to upload multiple images
 uploaded_files = st.file_uploader(
-    "Upload multiple images (PNG, JPG, JPEG, BMP, GIF)", 
+    "อัปโหลดหลายภาพ (PNG, JPG, JPEG, BMP, GIF)", 
     type=["png", "jpg", "jpeg", "bmp", "gif"], 
     accept_multiple_files=True
 )
 
 if uploaded_files:
-    st.write(f"Uploaded {len(uploaded_files)} images.")
+    st.write(f"อัปโหลดแล้ว {len(uploaded_files)} ภาพ")
 
     # Combine and create ZIP file when the button is pressed
-    if st.button("Combine Images and Download ZIP"):
-        with st.spinner("Processing images..."):
+    if st.button("เริ่มการรวมภาพ"):
+        with st.spinner("กำลังประมวลผลภาพ..."):
             output_zip = combine_images_and_create_zip(uploaded_files)
 
-        st.success("Images combined successfully!")
+        st.success("การรวมภาพเสร็จสมบูรณ์!")
 
         # Provide a download link
         st.download_button(
-            label="Download Combined Images as ZIP",
+            label="ดาวน์โหลดไฟล์ ZIP",
             data=output_zip.getvalue(),
             file_name="combined_images.zip",
             mime="application/zip"
