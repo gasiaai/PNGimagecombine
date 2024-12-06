@@ -4,6 +4,7 @@ from PIL import Image
 from difflib import SequenceMatcher
 import streamlit as st
 import zipfile
+from io import BytesIO
 
 CONFIG_FILE = "config.json"
 
@@ -24,36 +25,40 @@ def find_similar_groups(folder_path, threshold=0.75):
         groups.append(group)
     return groups
 
-def combine_images_from_folder(folder_path):
+def combine_images_and_save_to_zip(folder_path):
     groups = find_similar_groups(folder_path)
     total_groups = len(groups)
     progress = st.progress(0)
 
-    for index, group in enumerate(groups):
-        if len(group) > 1:
-            images = [Image.open(os.path.join(folder_path, image)).convert("RGBA") for image in group]
+    output_zip = BytesIO()
+    with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for index, group in enumerate(groups):
+            if len(group) > 1:
+                images = [Image.open(os.path.join(folder_path, image)).convert("RGBA") for image in group]
 
-            total_width = sum(image.width for image in images)
-            max_height = max(image.height for image in images)
+                total_width = sum(image.width for image in images)
+                max_height = max(image.height for image in images)
 
-            combined_image = Image.new('RGBA', (total_width, max_height), (255, 255, 255, 0))
+                combined_image = Image.new('RGBA', (total_width, max_height), (255, 255, 255, 0))
 
-            x_offset = 0
-            for image in images:
-                combined_image.paste(image, (x_offset, 0), image)
-                x_offset += image.width
+                x_offset = 0
+                for image in images:
+                    combined_image.paste(image, (x_offset, 0), image)
+                    x_offset += image.width
 
-            output_path = os.path.join(folder_path, f"combined_{group[0]}")
-            combined_image.save(output_path)
-            st.write(f"Combined image saved as: {output_path}")
+                combined_image_name = f"combined_{group[0]}"
+                combined_image_path = os.path.join(folder_path, combined_image_name)
+                combined_image.save(combined_image_path)
 
-            # Remove the other images in the group
-            for image in group[1:]:
-                os.remove(os.path.join(folder_path, image))
+                # Add the combined image to the ZIP file
+                zipf.write(combined_image_path, combined_image_name)
 
-        progress.progress((index + 1) / total_groups)
+                # Clean up the saved file
+                os.remove(combined_image_path)
 
-    st.success("Image combination completed successfully.")
+            progress.progress((index + 1) / total_groups)
+
+    return output_zip
 
 def save_last_folder(folder_path):
     with open(CONFIG_FILE, 'w') as f:
@@ -69,16 +74,26 @@ def load_last_folder():
 # Streamlit UI
 st.title("Image Combine by Gasia")
 
-# Folder selection using a ZIP upload workaround
-uploaded_zip = st.file_uploader("Upload a ZIP file containing images", type=["zip"])
-if uploaded_zip:
-    with zipfile.ZipFile(uploaded_zip, 'r') as zip_ref:
-        extract_folder = "uploaded_folder"
-        zip_ref.extractall(extract_folder)
-        st.success("ZIP file uploaded and extracted successfully.")
+# Folder selection
+folder_path = st.text_input("Enter the folder path containing images", value=load_last_folder())
+if st.button("Save Folder Path"):
+    save_last_folder(folder_path)
+    st.success("Folder path saved!")
 
-        # Display folder contents
-        folder_path = extract_folder
-        st.write(f"Extracted files in: `{folder_path}`")
-        if st.button("Start"):
-            combine_images_from_folder(folder_path)
+# Start processing
+if st.button("Start Combining Images"):
+    if folder_path and os.path.isdir(folder_path):
+        with st.spinner("Processing images..."):
+            output_zip = combine_images_and_save_to_zip(folder_path)
+
+        st.success("Images combined and saved into a ZIP file!")
+
+        # Provide a download link
+        st.download_button(
+            label="Download ZIP File",
+            data=output_zip.getvalue(),
+            file_name="combined_images.zip",
+            mime="application/zip"
+        )
+    else:
+        st.warning("Please enter a valid folder path.")
