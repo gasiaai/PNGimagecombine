@@ -42,7 +42,9 @@ def combine_images_and_create_zip(uploaded_files):
                     combined_image.paste(image, (x_offset, 0), image)
                     x_offset += image.width
 
-                combined_image_name = f"combined_group_{index + 1}.png"
+                # Use the name of the first file in the group for the combined image
+                original_name = os.path.splitext(group[0].name)[0]
+                combined_image_name = f"{original_name}_combined.png"
 
                 # Save the combined image to the ZIP file
                 with BytesIO() as img_buffer:
